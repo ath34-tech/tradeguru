@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { Save, Loader2, Calendar, Clock } from 'lucide-react';
+import { Save, Loader2, Calendar, Clock, FileUp, CheckCircle, XCircle, Upload, AlertCircle } from 'lucide-react';
 
 export default function MentorProfilePage() {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [uploading, setUploading] = useState(false);
     const [profile, setProfile] = useState({
         experience_years: 0,
         specialization: '',
@@ -15,6 +16,8 @@ export default function MentorProfilePage() {
         price_per_20min: 0,
         price_per_week: 0,
         price_per_month: 0,
+        verification_status: 'NOT_SUBMITTED',
+        verification_document_url: null,
     });
 
     useEffect(() => {
@@ -61,6 +64,100 @@ export default function MentorProfilePage() {
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleDocumentUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validate file size (max 5MB for MVP)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('File size must be less than 5MB');
+            return;
+        }
+
+        // Validate file type
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Only PDF, JPG, and PNG files are allowed');
+            return;
+        }
+
+        setUploading(true);
+
+        try {
+            // For MVP: Convert to base64 and store directly in database
+            // In production, use Supabase Storage
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64 = reader.result;
+
+                const { error } = await supabase
+                    .from('mentor_profiles')
+                    .upsert({
+                        id: user.id,
+                        ...profile,
+                        verification_document_url: base64,
+                        verification_status: 'PENDING',
+                        verification_submitted_at: new Date().toISOString(),
+                    });
+
+                if (error) throw error;
+
+                setProfile({
+                    ...profile,
+                    verification_document_url: base64,
+                    verification_status: 'PENDING',
+                });
+
+                alert('Verification document uploaded! Status: Pending Review');
+            };
+
+            reader.readAsDataURL(file);
+        } catch (error) {
+            console.error('Error uploading document:', error);
+            alert('Failed to upload document');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const getVerificationBadge = () => {
+        const status = profile.verification_status;
+
+        if (status === 'VERIFIED') {
+            return (
+                <div className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-lg">
+                    <CheckCircle size={20} />
+                    <span className="font-semibold">Verified Mentor</span>
+                </div>
+            );
+        }
+
+        if (status === 'PENDING') {
+            return (
+                <div className="flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-400 rounded-lg">
+                    <AlertCircle size={20} />
+                    <span className="font-semibold">Pending Verification</span>
+                </div>
+            );
+        }
+
+        if (status === 'REJECTED') {
+            return (
+                <div className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 rounded-lg">
+                    <XCircle size={20} />
+                    <span className="font-semibold">Verification Rejected</span>
+                </div>
+            );
+        }
+
+        return (
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-500/20 text-gray-400 rounded-lg">
+                <AlertCircle size={20} />
+                <span className="font-semibold">Not Verified</span>
+            </div>
+        );
     };
 
     if (loading) {
@@ -190,6 +287,78 @@ export default function MentorProfilePage() {
                     </div>
                 </div>
 
+                {/* Verification Section */}
+                <div className="space-y-6 border-t border-white/10 pt-8">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-bold">Mentor Verification</h3>
+                        {getVerificationBadge()}
+                    </div>
+
+                    <div className="glass-card p-6 rounded-xl border border-white/10">
+                        <div className="flex items-start gap-4 mb-4">
+                            <FileUp className="text-brand-400 mt-1" size={24} />
+                            <div className="flex-1">
+                                <h4 className="font-semibold mb-2">Upload Verification Documents</h4>
+                                <p className="text-sm text-gray-400 mb-4">
+                                    Upload proof of your trading expertise such as:
+                                </p>
+                                <ul className="text-sm text-gray-400 space-y-1 mb-4">
+                                    <li>• Trading certificates or qualifications</li>
+                                    <li>• Profit/Loss statements (with sensitive details redacted)</li>
+                                    <li>• Broker account screenshots</li>
+                                    <li>• Trading course completion certificates</li>
+                                </ul>
+                                <p className="text-xs text-gray-500">
+                                    Accepted formats: PDF, JPG, PNG (Max 5MB)
+                                </p>
+                            </div>
+                        </div>
+
+                        {profile.verification_status === 'NOT_SUBMITTED' || profile.verification_status === 'REJECTED' ? (
+                            <div>
+                                <input
+                                    type="file"
+                                    id="verification-doc"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    onChange={handleDocumentUpload}
+                                    className="hidden"
+                                    disabled={uploading}
+                                />
+                                <label
+                                    htmlFor="verification-doc"
+                                    className={`flex items-center justify-center gap-2 w-full px-6 py-3 bg-brand-600 hover:bg-brand-500 rounded-lg font-medium transition-all cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''
+                                        }`}
+                                >
+                                    {uploading ? (
+                                        <>
+                                            <Loader2 className="animate-spin" size={20} />
+                                            <span>Uploading...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Upload size={20} />
+                                            <span>{profile.verification_status === 'REJECTED' ? 'Re-upload Document' : 'Upload Document'}</span>
+                                        </>
+                                    )}
+                                </label>
+                            </div>
+                        ) : profile.verification_status === 'PENDING' ? (
+                            <div className="text-center py-4">
+                                <p className="text-sm text-gray-400">
+                                    Your verification document has been submitted and is pending admin review.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="text-center py-4">
+                                <p className="text-sm text-green-400">
+                                    ✓ You are a verified mentor!
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Save Button */}
                 <button
                     type="submit"
                     disabled={saving}
