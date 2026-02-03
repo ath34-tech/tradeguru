@@ -211,8 +211,8 @@ export default function WalletPage() {
                                     key={amount}
                                     onClick={() => setRechargeAmount(amount)}
                                     className={`py-3 px-4 rounded-lg font-medium transition-all ${rechargeAmount === amount
-                                            ? 'bg-brand-600 text-white'
-                                            : 'bg-white/5 hover:bg-white/10 text-gray-300'
+                                        ? 'bg-brand-600 text-white'
+                                        : 'bg-white/5 hover:bg-white/10 text-gray-300'
                                         }`}
                                 >
                                     ₹{amount}

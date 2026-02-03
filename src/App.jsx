@@ -13,6 +13,7 @@ import WalletPage from './pages/WalletPage';
 import AIChatPage from './pages/AIChatPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import MyChatsPage from './pages/MyChatsPage';
 
 function App() {
   return (
@@ -29,12 +30,15 @@ function App() {
           <Route path="/mentors" element={<MentorsPage />} />
           <Route path="/wallet" element={<WalletPage />} />
           <Route path="/ai-chat" element={<AIChatPage />} />
+          <Route path="/chats" element={<MyChatsPage />} />
           <Route path="/subscriptions" element={<SubscriptionsPage />} />
         </Route>
       </Route>
 
       {/* Chat Page (special route without sidebar) */}
-      <Route path="/chat/:sessionId" element={<AuthGuard allowedRoles={['USER', 'MENTOR']}><ChatPage /></AuthGuard>} />
+      <Route element={<AuthGuard allowedRoles={['USER', 'MENTOR']} />}>
+        <Route path="/chat/:sessionId" element={<ChatPage />} />
+      </Route>
 
       {/* Protected Mentor Routes */}
       <Route element={<AuthGuard allowedRoles={['MENTOR']} />}>

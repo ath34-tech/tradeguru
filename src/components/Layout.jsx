@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, Users, MessageSquare, LogOut, GraduationCap, TrendingUp, Wallet, Calendar, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Users, MessageSquare, LogOut, GraduationCap, TrendingUp, Wallet, Calendar, BarChart3, Home, Bot, CreditCard } from 'lucide-react';
 
 export default function Layout() {
     const { user, profile, signOut } = useAuth();
@@ -20,12 +20,13 @@ export default function Layout() {
             { label: 'Profile', path: '/mentor/profile', icon: Users },
         ]
         : [
-            { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+            { label: 'Dashboard', path: '/dashboard', icon: Home },
             { label: 'Analytics', path: '/analytics', icon: BarChart3 },
-            { label: 'Mentors', path: '/mentors', icon: GraduationCap },
-            { label: 'My Subscriptions', path: '/subscriptions', icon: Calendar },
+            { label: 'Find Mentors', path: '/mentors', icon: Users },
+            { label: 'My Chats', path: '/chats', icon: MessageSquare },
+            { label: 'AI Assistant', path: '/ai-chat', icon: Bot },
             { label: 'Wallet', path: '/wallet', icon: Wallet },
-            { label: 'AI Assistant', path: '/ai-chat', icon: MessageSquare },
+            { label: 'Subscriptions', path: '/subscriptions', icon: CreditCard },
         ];
 
     return (

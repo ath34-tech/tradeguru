@@ -19,6 +19,7 @@ export const AuthProvider = ({ children }) => {
         if (cachedUser) setUser(cachedUser);
         if (cachedProfile) setProfile(cachedProfile);
 
+        // Check active session
         supabase.auth.getSession().then(({ data: { session } }) => {
             const sessionUser = session?.user ?? null;
             setUser(sessionUser);
@@ -59,32 +60,43 @@ export const AuthProvider = ({ children }) => {
 
             if (error) {
                 console.error('Profile fetch error:', error.message);
-                await supabase.auth.signOut();
+                // Don't sign out, just log the error
                 setProfile(null);
-                setUser(null);
-                clearUserData();
-                alert('Profile not found. Please contact support or sign up again.');
-                navigate('/login');
+                setLoading(false);
             } else if (!data) {
-                console.error('No profile found for user');
-                await supabase.auth.signOut();
-                setProfile(null);
-                setUser(null);
-                clearUserData();
-                alert('Your profile was not created properly. Please sign up again.');
-                navigate('/signup');
+                // No profile found - this might be a new user
+                console.warn('No profile found for user:', userId);
+                // Try to create a basic profile
+                const { data: newProfile, error: createError } = await supabase
+                    .from('profiles')
+                    .insert({
+                        id: userId,
+                        email: (await supabase.auth.getUser()).data.user?.email,
+                        full_name: (await supabase.auth.getUser()).data.user?.user_metadata?.full_name || 'User',
+                        role: 'USER'
+                    })
+                    .select()
+                    .single();
+
+                if (createError) {
+                    console.error('Failed to create profile:', createError);
+                    setProfile(null);
+                } else {
+                    setProfile(newProfile);
+                    saveProfile(newProfile);
+
+                    // Also create wallet for new user
+                    await supabase.from('wallets').insert({ user_id: userId, balance: 0 });
+                }
+                setLoading(false);
             } else {
                 setProfile(data);
                 saveProfile(data);
+                setLoading(false);
             }
         } catch (error) {
             console.error('Error fetching profile:', error);
-            await supabase.auth.signOut();
             setProfile(null);
-            setUser(null);
-            clearUserData();
-            navigate('/login');
-        } finally {
             setLoading(false);
         }
     };
@@ -99,7 +111,7 @@ export const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={{ user, profile, loading, signOut }}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
 };
