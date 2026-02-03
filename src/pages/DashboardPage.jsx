@@ -122,32 +122,115 @@ export default function DashboardPage() {
 
     const handleAddStock = async (e) => {
         e.preventDefault();
-
         if (!profile?.id) {
             alert('Profile not loaded. Please refresh the page.');
             return;
         }
 
+        // Validate stock symbol
+        if (!newStock.symbol || newStock.symbol.trim() === '') {
+            alert('Please enter a stock symbol or search for a stock');
+            return;
+        }
+
+        // Validate stock exists in our database (handle .NS and .BSE suffixes)
+        const cleanSymbol = newStock.symbol.toUpperCase().replace('.NS', '').replace('.BSE', '');
+        const stockExists = POPULAR_STOCKS.find(
+            s => s.symbol.toUpperCase().replace('.NS', '').replace('.BSE', '') === cleanSymbol
+        );
+
+        if (!stockExists) {
+            alert(`Invalid stock symbol: ${newStock.symbol}\n\nPlease:\n1. Search for a stock using the search bar\n2. Select from popular stocks\n3. Or manually enter a valid NSE/BSE symbol`);
+            return;
+        }
+
+        // Validate quantity
+        const quantity = parseInt(newStock.quantity);
+        if (!quantity || quantity <= 0) {
+            alert('Please enter a valid quantity (must be greater than 0)');
+            return;
+        }
+
+        if (quantity > 10000) {
+            alert('Maximum quantity allowed is 10,000 shares');
+            return;
+        }
+
+        // Validate price
+        const buyPrice = parseFloat(newStock.buy_price);
+        if (!buyPrice || buyPrice <= 0) {
+            alert('Please enter a valid buy price (must be greater than 0)');
+            return;
+        }
+
+        // STRICT: Get current market price and enforce it
+        let currentPrice = null;
         try {
-            const { error } = await supabase
-                .from('portfolios')
-                .insert({
-                    user_id: profile.id,
-                    stock_symbol: newStock.symbol.toUpperCase(),
-                    quantity: parseInt(newStock.quantity),
-                    buy_price: parseFloat(newStock.buy_price),
-                });
+            const currentMarketData = await getStockPrice(stockExists.symbol);
+            if (currentMarketData && currentMarketData.price) {
+                currentPrice = currentMarketData.price;
+                const priceDifference = Math.abs(currentPrice - buyPrice);
+                const priceVariance = (priceDifference / currentPrice) * 100;
+
+                // STRICT: Only allow up to 5% variance (reduced from 10%)
+                if (priceVariance > 5) {
+                    alert(
+                        `❌ Invalid Price!\n\n` +
+                        `Your price: ₹${buyPrice}\n` +
+                        `Current market price: ₹${currentPrice.toFixed(2)}\n` +
+                        `Variance: ${priceVariance.toFixed(1)}%\n\n` +
+                        `Please use the "Search Stock" feature to auto-fill the current market price.\n\n` +
+                        `Maximum allowed variance: 5%`
+                    );
+                    return;
+                }
+            } else {
+                // If we can't fetch price, don't allow purchase
+                alert(
+                    `❌ Cannot verify market price for ${newStock.symbol}\n\n` +
+                    `Please:\n` +
+                    `1. Use the search feature to select this stock\n` +
+                    `2. Wait for the current price to load\n` +
+                    `3. Then add to portfolio\n\n` +
+                    `This ensures you're using real market data.`
+                );
+                return;
+            }
+        } catch (error) {
+            console.error('Error fetching market price:', error);
+            alert(
+                `❌ Cannot verify market price\n\n` +
+                `Real-time price verification is required to prevent fake values.\n\n` +
+                `Please use the search feature to select a stock with live pricing.`
+            );
+            return;
+        }
+
+        // Calculate total investment
+        const totalInvestment = quantity * buyPrice;
+        if (totalInvestment > 10000000) { // 1 crore limit
+            alert('Maximum investment per stock is ₹1,00,00,000 (1 Crore)');
+            return;
+        }
+
+        try {
+            const { error } = await supabase.from('portfolios').insert({
+                user_id: profile.id,
+                stock_symbol: newStock.symbol.toUpperCase(),
+                quantity: quantity,
+                buy_price: buyPrice,
+            });
 
             if (error) throw error;
 
-            setShowAddStock(false);
-            setNewStock({ symbol: '', quantity: 1, buy_price: 0 });
+            setShowAddStock(false); // Changed from setShowAddModal
+            setNewStock({ symbol: '', quantity: 1, buy_price: '' });
             setSelectedStock(null);
             setStockSearch('');
             fetchPortfolio();
         } catch (error) {
             console.error('Error adding stock:', error);
-            alert('Failed to add stock');
+            alert('Failed to add stock. Please try again.');
         }
     };
 
