@@ -43,6 +43,7 @@ export default function SubscriptionsPage() {
 
         try {
             // Create a new subscription-based chat session
+            // Subscription chats expire when the subscription expires (unlimited until then)
             const { data: session, error } = await supabase
                 .from('chat_sessions')
                 .insert({
@@ -52,6 +53,9 @@ export default function SubscriptionsPage() {
                     subscription_id: subscription.id,
                     status: 'ACTIVE',
                     started_at: new Date().toISOString(),
+                    expires_at: subscription.expires_at, // Uses subscription expiry!
+                    duration_minutes: null, // No time limit for subscription chats
+                    amount_paid: 0, // Already paid via subscription
                 })
                 .select()
                 .single();
